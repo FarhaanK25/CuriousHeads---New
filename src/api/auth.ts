@@ -3,7 +3,7 @@ import axios from 'axios';
 
 // Create an axios instance with the base URL from VITE_API_URL or fallback
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5001/api',
   withCredentials: true,
 });
 
@@ -14,7 +14,7 @@ export const registerUser = async (userData: any) => {
     return response.data;
   } catch (error: any) {
     if (error.code === 'ECONNREFUSED') {
-      throw new Error("Connection Refused: Ensure the backend server is running at http://localhost:5000");
+      throw new Error("Connection Refused: Ensure the backend server is running at http://localhost:51401");
     }
     throw error.response ? error.response.data : error;
   }
