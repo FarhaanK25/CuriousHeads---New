@@ -8,7 +8,7 @@ import { ArrowLeft, ThumbsUp, ThumbsDown, MessageCircle, Share, Bookmark, Edit, 
 import { Separator } from './ui/separator';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Label } from './ui/label';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 
 export function QuestionDetailPage({ questionId, user, onNavigate, onLogout }) {
   const [newAnswer, setNewAnswer] = useState('');

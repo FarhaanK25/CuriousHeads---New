@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
@@ -10,6 +10,7 @@ import { ArrowLeft, Search, Plus, ThumbsUp, ThumbsDown, MessageCircle, Filter, T
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Label } from './ui/label';
+import { fetchQuestions, askQuestion } from '../api/questions';
 
 export function QuestionPage({ user, onNavigate, onLogout }) {
   const [searchQuery, setSearchQuery] = useState('');
@@ -20,6 +21,25 @@ export function QuestionPage({ user, onNavigate, onLogout }) {
     topic: '',
     difficulty: ''
   });
+  const [questions, setQuestions] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      setError('');
+      try {
+        const data = await fetchQuestions();
+        setQuestions(Array.isArray(data) ? data : data?.questions || []);
+      } catch (e: any) {
+        setError(e?.message || 'Failed to load questions');
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, []);
 
   const mockQuestions = [
     {
@@ -89,20 +109,34 @@ export function QuestionPage({ user, onNavigate, onLogout }) {
     }
   ];
 
-  const handleAskQuestion = () => {
-    console.log('New question:', newQuestion);
-    setIsAskingQuestion(false);
-    setNewQuestion({ title: '', description: '', topic: '', difficulty: '' });
+  const handleAskQuestion = async () => {
+    try {
+      const payload = {
+        title: newQuestion.title,
+        description: newQuestion.description,
+        topic: newQuestion.topic,
+        difficulty: newQuestion.difficulty,
+      };
+      await askQuestion(payload);
+      setIsAskingQuestion(false);
+      setNewQuestion({ title: '', description: '', topic: '', difficulty: '' });
+      const refreshed = await fetchQuestions();
+      setQuestions(Array.isArray(refreshed) ? refreshed : refreshed?.questions || []);
+    } catch (e) {
+      // swallow
+    }
   };
 
   const handleQuestionClick = (questionId) => {
     onNavigate('question-detail', questionId);
   };
 
-  const filteredQuestions = mockQuestions.filter(question =>
-    question.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    question.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  const filteredQuestions = questions.filter((question: any) => {
+    const titleMatch = (question.title || '').toLowerCase().includes(searchQuery.toLowerCase());
+    const tags: string[] = question.tags || [];
+    const tagMatch = tags.some(tag => (tag || '').toLowerCase().includes(searchQuery.toLowerCase()));
+    return titleMatch || tagMatch;
+  });
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50">
@@ -306,11 +340,21 @@ export function QuestionPage({ user, onNavigate, onLogout }) {
               </TabsList>
               
               <TabsContent value="all" className="space-y-6 animate-fade-in-up" style={{animationDelay: '0.1s'}}>
-                {filteredQuestions.map((question, index) => (
+                {loading && (
+                  <Card className="glass border-white/20">
+                    <CardContent className="p-6">Loading questions...</CardContent>
+                  </Card>
+                )}
+                {error && (
+                  <Card className="glass border-white/20">
+                    <CardContent className="p-6 text-red-600">{error}</CardContent>
+                  </Card>
+                )}
+                {!loading && !error && filteredQuestions.map((question, index) => (
                   <Card 
-                    key={question.id} 
+                    key={question._id || question.id || index} 
                     className="glass border-white/20 shadow-elegant hover:shadow-luxury transition-all hover-lift cursor-pointer group"
-                    onClick={() => handleQuestionClick(question.id)}
+                    onClick={() => handleQuestionClick(question._id || question.id)}
                     style={{animationDelay: `${0.1 + index * 0.1}s`}}
                   >
                     <CardContent className="p-6">
@@ -325,7 +369,7 @@ export function QuestionPage({ user, onNavigate, onLogout }) {
                           >
                             <ThumbsUp className="w-5 h-5" />
                           </Button>
-                          <span className="text-lg font-bold text-slate-700">{question.upvotes - question.downvotes}</span>
+                          <span className="text-lg font-bold text-slate-700">{(question.upvotes || 0) - (question.downvotes || 0)}</span>
                           <Button 
                             variant="ghost" 
                             size="icon" 
@@ -359,7 +403,7 @@ export function QuestionPage({ user, onNavigate, onLogout }) {
                                     Trending
                                   </Badge>
                                 )}
-                                <Badge variant="outline" className="border-slate-300">{question.difficulty}</Badge>
+                                <Badge variant="outline" className="border-slate-300">{question.difficulty || 'General'}</Badge>
                                 {question.hasAnswer && (
                                   <Badge className="bg-gradient-to-r from-emerald-500 to-green-500 text-white">
                                     <Star className="w-3 h-3 mr-1" />
@@ -378,7 +422,7 @@ export function QuestionPage({ user, onNavigate, onLogout }) {
 
                           <div className="flex items-center justify-between">
                             <div className="flex space-x-2">
-                              {question.tags.map((tag) => (
+                              {(question.tags || []).map((tag) => (
                                 <Badge 
                                   key={tag} 
                                   variant="secondary" 
@@ -394,12 +438,12 @@ export function QuestionPage({ user, onNavigate, onLogout }) {
                                 <Avatar className="w-8 h-8 ring-2 ring-white/50">
                                   <AvatarImage src={question.authorAvatar} />
                                   <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-500 text-white text-xs">
-                                    {question.author.charAt(0)}
+                                    {(question.author || 'U').charAt(0)}
                                   </AvatarFallback>
                                 </Avatar>
                                 <div>
-                                  <div className="font-medium text-slate-700">{question.author}</div>
-                                  <div className="text-xs">{question.college} • {question.time}</div>
+                                  <div className="font-medium text-slate-700">{question.author || 'User'}</div>
+                                  <div className="text-xs">{question.college || ''}</div>
                                 </div>
                               </div>
                             </div>
